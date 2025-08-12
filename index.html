@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Underworld Tarot Widget — Notion Safe</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --gold:#d9b86c; --bg1:#0b0b0f; --bg2:#050507; --edge:rgba(217,184,108,.35); --muted:#9f8752; }
+  html,body{height:100%}
+  *{box-sizing:border-box}
+  body{
+    background: radial-gradient(circle at 50% 35%, var(--bg1), var(--bg2));
+    font-family:'Cinzel',serif; color:var(--gold);
+    margin:0; display:flex; flex-direction:column; align-items:center; gap:16px; padding:16px;
+  }
+  h1{margin:8px 0 0; font-size:20px; letter-spacing:1px}
+  .widget{width:min(960px,100%); display:flex; flex-direction:column; gap:12px}
+  .controls{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center}
+  .btn{appearance:none; border:1px solid var(--edge); background:transparent; color:var(--gold);
+       padding:8px 12px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:14px}
+  .btn[aria-pressed="true"]{outline:2px solid var(--gold)}
+  .tray{display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap}
+
+  /* CARD + 3D FLIP */
+  .card{
+    width:210px; aspect-ratio:3/5; border-radius:10px; border:1px solid var(--edge);
+    background:#121216; position:relative; overflow:hidden;
+    perspective: 1000px; /* enables 3D flip */
+  }
+  .card-inner{
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 600ms;
+    will-change: transform;
+    /* optional easing for nicer feel */
+    transition-timing-function: cubic-bezier(.2,.7,.2,1);
+  }
+  /* when flipped, rotate the inner */
+  .card.show-back .card-inner{
+    transform: rotateY(180deg); }
+
+  .card-face{
+    position:absolute; inset:0; display:grid; place-items:center; padding:10px;
+    backface-visibility: hidden; /* keeps hidden side from showing */ }
+  .front{background:#121216}
+  .front img{max-width:100%; max-height:100%; object-fit:cover; display:block}
+  .label{position:absolute; bottom:6px; left:0; right:0; text-align:center; font-size:14px; text-shadow:0 0 6px #000}
+
+  /* back face is rotated so it becomes visible when parent flips */
+  .back{
+    background:linear-gradient(180deg,#0e0e12,#0a0a0d);
+    transform: rotateY(180deg);
+  }
+  .back .back-wrap{display:flex; flex-direction:column; gap:8px; width:100%; height:100%; overflow:auto}
+  .back h3{margin:0; font-size:16px; text-align:center}
+  .badge{font-size:11px; color:var(--muted); text-align:center}
+  .keywords{display:flex; felx-direction:row; flex-wrap:wrap; gap:6px; justify-content:space-around; padding:0 8px}
+  .kw{border:1px solid var(--edge); border-radius:999px; padding:4px 8px; font-size:11px}
+  .meaning{font-size:10px; line-height:1.35; padding:0 12px 12px; color:#d7caa7}
+  .hidden{display:none !important}
+  .position-label {
+    margin-top: auto;
+    padding-bottom: 8px;
+  }
+  .footer{font-size:12px; opacity:.75; text-align:center}
+
+  /* accessibility: respect reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    .card-inner{ transition: none; }
+  }
+</style>
+</head>
+<body>
+  <h1>Underworld Tarot</h1>
+  <div class="widget" id="app">
+    <div class="controls">
+      <button class="btn" id="modeSingle" aria-pressed="true" title="Single-card spread">Single</button>
+      <button class="btn" id="modeThree" aria-pressed="false" title="Three-card spread">Three</button>
+    </div>
+
+    <div class="tray" id="singleTray">
+      <div class="card" id="singleCard">
+        <div class="card-face front">
+          <img alt="Tarot card" id="singleImg">
+          <div class="label" id="singleLabel"></div>
+        </div>
+        <div class="card-face back">
+          <div class="back-wrap">
+            <h3 id="backTitle"></h3>
+            <div class="badge">Underworld Tarot</div>
+            <div class="keywords" id="backKeywords"></div>
+            <div class="meaning" id="backMeaning"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tray hidden" id="threeTray">
+      <div class="card">
+        <div class="card-face front"><img id="three0"><div class="label" id="threeLabel0"></div></div>
+        <div class="card-face back">
+          <div class="back-wrap"><h3 id="threeBackTitle0"></h3><div class="badge">Underworld Tarot</div><div class="keywords" id="threeBackKw0"></div><div class="meaning" id="threeBackMean0"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-face front"><img id="three1"><div class="label" id="threeLabel1"></div></div>
+        <div class="card-face back">
+          <div class="back-wrap"><h3 id="threeBackTitle1"></h3><div class="badge">Underworld Tarot</div><div class="keywords" id="threeBackKw1"></div><div class="meaning" id="threeBackMean1"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-face front"><img id="three2"><div class="label" id="threeLabel2"></div></div>
+        <div class="card-face back">
+          <div class="back-wrap"><h3 id="threeBackTitle2"></h3><div class="badge">Underworld Tarot</div><div class="keywords" id="threeBackKw2"></div><div class="meaning" id="threeBackMean2"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+// --------------------
+// Notion-safe tarot widget with front image + back metadata
+// --------------------
+
+// 👉 IMPORTANT: Use ABSOLUTE HTTPS image URLs hosted with CORS enabled (e.g., GitHub Pages/site CDN).
+// Avoid raw.githubusercontent.com direct links inside Notion (often blocked by CORS).
+
+const MAWBOUND_OMEN = {
+  name:'Mawbound Omen',
+  image:'https://i.pinimg.com/736x/96/0e/16/960e16a3fc2c41e5993a0d30472812bd.jpg', // replace with your hosted PNG
+  keywords:['Omen of Fang','Judgment Walks','Gate’s Breath'],
+  meaning:`When this appears, the Gate is watching. Choices harden. Cowardice has consequence; courage has cost.`
+};
+
+// Swap this with your real DECK export
+const DECK = [
+{ name:'The Fool', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-haupalwrk2de1.png?width=640&crop=smart&auto=webp&s=95a62b4ec71813395514c7c8780a6cbace0472f5', keywords:['Reckoning Dawn','Shadow’s Edge','First Step','Abyss Whisper','Hollow Trust','Fated Drift','Silent Dare','Threshold Breath','Ashlight'], meaning:'A conscious, dangerous leap into the unknown. It’s the moment before the plunge, where safety is gone and only willpower remains. This card marks risky beginnings—stepping forward not out of naivety, but because staying still leads to decay.' },
+
+  { name:'The Magician', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-kxtsylwrk2de1.png?width=640&crop=smart&auto=webp&s=3a2a0b90376ff6ec8807e30ba3cc070639a930b6', keywords:['Bloodcraft','Shadowbinding','Will’s Fang','Arcane Thread','Veiled Command','Mirrorhand','Soulforge','Whispered Flame','Dominion Seed'], meaning:'A master of hidden forces, shaping reality through will, sacrifice, and precision. This card signals potent influence—every action can alter fate—but warns that power taken from the abyss demands a debt. Creation and destruction are wielded by the same hand; use them with intent.' },
+
+  { name:'The High Priestess', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-gbc65lwrk2de1.png?width=640&crop=smart&auto=webp&s=18af72744fc20dfd08f2c837f249d516ec7e970a', keywords:['Veilborn','Moonblood','Silent Oath','Shadowveil','Gravewater','Hidden Flame','Bone Memory','Oracle’s Thorn','Nightmind'], meaning:'Guardian of hidden truths and silent thresholds, she rules where intuition eclipses proof. This card signals knowledge present but concealed, urging patience, perception, and trust in the unseen. The truth will reveal itself only when you’re ready to bear it.' },
+
+  { name:'The Empress', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-3zjkflwrk2de1.png?width=640&crop=smart&auto=webp&s=3104a1b728ec9a2a6004beff9619b64e83f277d2', keywords:['Thornmother','Bloodroot','Hollow Bloom','Crown of Ash','Velvet Dominion','Womb of Shadows','Serpent’s Gift','Grave Harvest','Crimson Tide'], meaning:'Fierce creation born from shadow, she cultivates beauty and abundance through sacrifice. This card urges you to wield your power to create—whether life, art, or legacy—knowing true growth often demands a cost. She thrives in barren soil, feeding beginnings with endings.' },
+
+  { name:'The Emperor', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-9t62nlwrk2de1.png?width=640&crop=smart&auto=webp&s=38e844366c6ba9930ff4d47ea2ad196d291f44c9', keywords:['Iron Crown','Obsidian Law','Bloodline Throne','Silent Dominion','Bonekeep','Shadow Edict','Black Sigil','Fortress Will','Sovereign Stone'], meaning:'Unyielding ruler and enforcer of order, his power is built on discipline, legacy, and consequence. This card calls for structure, decisiveness, and vigilance—reminding you that true sovereignty is guarded, not simply held. Boundaries are the foundation of lasting power.' },
+
+  { name:'The Hierophant', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-apuh2nwrk2de1.png?width=640&crop=smart&auto=webp&s=8ae21e38403bdd6d2c1060af601a66e213a5361a', keywords:['Gravekeeper','Blood Rite','Ashen Creed','Thorned Doctrine','Bone Scripture','Veilkeeper','Sanctum Law','Silent Benediction','Ritual Chain'], meaning:'Keeper of ancient covenants, he calls you to align with a greater power or tradition that demands obedience for belonging. This card marks initiation through sacrifice—shedding the old self to embody the new. Faith here is a binding contract, not a comfort.' },
+
+  { name:'The Lovers', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-mdegflwrk2de1.png?width=640&crop=smart&auto=webp&s=188bf7d10ce381ba7d162938c2ba844dbbb8dabb', keywords:['Bloodbound','Shadow Vow','Velvet Sin','Twin Flame','Thorned Union','Crimson Choice','Fate’s Kiss','Serpent Embrace','Hollow Devotion'], meaning:'A binding union forged in passion, loyalty, or ruin—where love transforms and marks you forever. This card speaks of choice as much as connection, reminding that every bond opens one path and closes another. True love here is the sharing of darkness, not its absence.' },
+
+  { name:'The Chariot', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-shgj3lwrk2de1.png?width=640&crop=smart&auto=webp&s=a3b00cd0c21c262ef7b6e77202b21248c9826ccd', keywords:['Graveward March','Iron Reins','Shadowsteed','Blood Drive','Bonewheel','Sovereign Pursuit','Nightbound','Ash Banner','Relentless Will'], meaning:'Relentless drive toward destiny, fueled by discipline and ferocity. This card urges you to command powerful, dangerous forces without losing control. Victory is seized, not given—and the journey will leave its mark.' },
+
+  { name:'Strength', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-z1t1cmwrk2de1.png?width=640&crop=smart&auto=webp&s=0806b31c9db180a0053146a5820ceb9c02751c1f', keywords:['Bloodsteel','Shadowheart','Beast Tamer','Crimson Resolve','Bonegrip','Silent Courage','Thornbound','Dark Mercy','Iron Pulse'], meaning:'Command of one’s inner darkness, gained through endurance and self-mastery. This card reflects power forged in scars, where fear and fury are tools—not threats—wielded without being consumed.' },
+
+  { name:'The Hermit', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-jaam5mwrk2de1.png?width=640&crop=smart&auto=webp&s=a064b5dbb3a041be25cef8a79cb2fcf87ba71727', keywords:['Gravecandle','Hollow Path','Bone Lantern','Silent Pilgrim','Ashveil','Nightwatcher','Soulseeker','Shadowlight','Solitary Oath'], meaning:'A deliberate withdrawal into solitude to seek truth and clarity. This card urges turning inward, walking alone into the dark to find revelations that only silence and self-exile can reveal.' },
+
+  { name:'Wheel of Fortune', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-n2mu1dxrk2de1.png?width=640&crop=smart&auto=webp&s=4ad2c1e40a08f6f748f7a437918ef279f40a37a9', keywords:['Fate’s Maw','Bloodturn','Shadow Cycle','Iron Spin','Crimson Thread','Thorned Chance','Ashbound','Sovereign Shift','Omenwheel'], meaning:'A relentless turning of fate that can crown or destroy. This card reminds you that triumph and ruin are part of the same cycle, urging you to face each shift with resolve—the spin that casts you down may also raise you up.' },
+
+  { name:'Justice', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-3faerrwrk2de1.png?width=640&crop=smart&auto=webp&s=f31872472fb3e9c7d270f307a31ac6568af07f60', keywords:['Bloodscale','Shadow Verdict','Iron Oath','Bone Balance','Crimson Truth','Silent Gavel','Ashweight','Fate’s Measure','Thorned Law'], meaning:'An unflinching reckoning that exposes truth without mercy. This card speaks of accountability, consequence, and balance restored—reminding you that in this realm, all debts are collected and nothing is forgotten.' },
+
+  { name:'The Hanged Man', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-uguwhpwrk2de1.png?width=640&crop=smart&auto=webp&s=a6c9855a0174fb2c5a2dd092972515072b741f75', keywords:['Bloodsuspension','Shadow Cross','Bonebinding','Inverted Oath','Crimson Pause','Fate’s Snare','Hollow Surrender','Veilbound','Ash Stillness'], meaning:'A willful pause and surrender to gain deeper vision. This card speaks of sacrifice as the price for clarity, revealing truths only visible when you yield to stillness instead of forcing movement.' },
+
+  { name:'Death', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-6c7ndrwrk2de1.png?width=640&crop=smart&auto=webp&s=87c8ff71321a7eb76fa15f86d1e564db4e285913', keywords:['Gravebirth','Bone Requiem','Ashen Crown','Blood Eclipse','Hollow Reaping','Shadow Gate','Crimson Release','Veilbreaker','Final Bloom'], meaning:'A decisive ending that clears the way for transformation. This card marks the severing of what no longer serves, demanding acceptance of change so something new can take root and breathe in the silence after.' },
+
+  { name:'The Devil', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-8nt3xowrk2de1.png?width=640&crop=smart&auto=webp&s=6c8f0fda3499bf96710e84d1606a39a7b220a3ce', keywords:['Chainlust','Shadow Pact','Blood Temptation','Hollow Hunger','Crimson Snare','Bone Desire','Sovereign Vice','Serpent Tongue','Nightbind'], meaning:'Temptation and obsession that bind by choice, not force. This card reveals the allure of what corrodes you, showing the buried desires you secretly indulge and daring you to admit you crave their touch.' },
+
+  { name:'The Tower', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-e6j35twrk2de1.png?width=640&crop=smart&auto=webp&s=0b1e6956d064c506b4735bf5aa911d3c9974feb5', keywords:['Ashfall','Bonebreak','Crimson Ruin','Shadow Collapse','Bloodlight','Hollow Shatter','Veilfracture','Sovereign Fall','Gravewake'], meaning:'A sudden, merciless collapse of false foundations, exposing hidden rot. This card warns that clinging to ruins will destroy you, but embracing the aftermath allows you to rebuild with unbreakable truth.' },
+
+  { name:'The Star', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-mzuu2owrk2de1.png?width=640&crop=smart&auto=webp&s=a39f32c9b67c142f3b0a880553741eeafd617803', keywords:['Nightwell','Bloodlight','Hollow Hope','Shadow Beacon','Veilshine','Bonewater','Crimson Guide','Silent Wish','Grave Dawn'], meaning:'A resilient light born from loss, guiding you toward renewal. This card speaks of hope as defiance, urging you to follow its glimmer through the shadows and trust that it will endure as long as you do.' },
+
+  { name:'The Moon', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-w5u65owrk2de1.png?width=640&crop=smart&auto=webp&s=b7cc5b84c8186e38788fa9bf594a658b8b16eb4a', keywords:['Veilshadow','Blooddream','Hollow Mirage','Grave Tide','Boneveil','Crimson Illusion','Nightwhisper','Ash Trance','Phantom Path'], meaning:'A realm of illusion and shifting truths, where deception—both external and internal—clouds the path. This card urges trusting deep instinct to navigate half-light and uncertainty, hunting clarity in the dark.' },
+
+  { name:'The Sun', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-1wk38owrk2de1.png?width=640&crop=smart&auto=webp&s=f59b82e1133ca166a66bf7b1c1fb19c1251d6285', keywords:['Bloodlight','Ash Radiance','Hollow Dawn','Crimson Joy','Gravefire','Shadow Bloom','Bonewarmth','Sovereign Glow','Silent Triumph'], meaning:'A fierce, unapologetic blaze of triumph and truth. This card marks revelation and hard-won joy, urging you to stand fully in your power and let your victories burn bright without apology.' },
+
+  { name:'Judgement', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-4hquht5ka5de1.jpeg?width=896&format=pjpg&auto=webp&s=2d8d7a76dff6b26219c99c9058ea7a08668eb15f', keywords:['Gravecall','Blood Reckoning','Hollow Rise','Ash Verdict','Bone Resurrection','Crimson Toll','Shadow Awakening','Veil Breaker','Final Witness'], meaning:'A relentless call to face the truth of your choices and their consequences. This card demands you rise to meet what you’ve created, or be consumed by what you’ve denied—the guilty always answer.' },
+
+  { name:'The World', image:'https://preview.redd.it/the-major-arcana-in-gothic-horror-slight-photoshopping-v0-dclkypfna5de1.jpeg?width=896&format=pjpg&auto=webp&s=86978ae0a5dbeec9c27f846897b3f59fdf3c78f0', keywords:['Bloodcircle','Shadow Crown','Hollow Completion','Veil’s End','Bone Horizon','Crimson Cycle','Grave Bloom','Ash Coronation','Eternal Seal'], meaning:'Completion forged through trials, uniting all parts of yourself—light and shadow alike. This card marks both ending and renewal, reminding you that every conclusion is an altar requiring an offering before the next journey begins.' },
+  ];
+DECK.unshift(MAWBOUND_OMEN);
+
+let idx = 0;            // current index for Single mode
+let mode = 'single';    // 'single' | 'three'
+let currentThree = [];  // cache of last three-card draw
+
+const els = {
+  modeSingle: document.getElementById('modeSingle'),
+  modeThree:  document.getElementById('modeThree'),
+  singleTray: document.getElementById('singleTray'),
+  threeTray:  document.getElementById('threeTray'),
+  singleCard: document.getElementById('singleCard'),
+  singleImg:  document.getElementById('singleImg'),
+  singleLabel:document.getElementById('singleLabel'),
+  backTitle:  document.getElementById('backTitle'),
+  backKeywords: document.getElementById('backKeywords'),
+  backMeaning:  document.getElementById('backMeaning'),
+  threeImgs:   [document.getElementById('three0'), document.getElementById('three1'), document.getElementById('three2')],
+  threeLabels: [document.getElementById('threeLabel0'), document.getElementById('threeLabel1'), document.getElementById('threeLabel2')],
+  threeBackTitles:[document.getElementById('threeBackTitle0'), document.getElementById('threeBackTitle1'), document.getElementById('threeBackTitle2')],
+  threeBackKws:   [document.getElementById('threeBackKw0'), document.getElementById('threeBackKw1'), document.getElementById('threeBackKw2')],
+  threeBackMeans: [document.getElementById('threeBackMean0'), document.getElementById('threeBackMean1'), document.getElementById('threeBackMean2')]
+};
+
+// show/hide trays + pressed state
+function syncModeUI(){
+  const s = mode === 'single';
+  els.singleTray.classList.toggle('hidden', !s);
+  els.threeTray.classList.toggle('hidden', s);
+  els.modeSingle.setAttribute('aria-pressed', s);
+  els.modeThree.setAttribute('aria-pressed', !s);
+}
+
+function safeSetImg(img, src, label){
+  img.src = src;
+  img.alt = label || 'Tarot card';
+  img.referrerPolicy = 'no-referrer';
+  img.onerror = ()=>{
+    // placeholder behavior if image is blocked
+    img.remove();
+  };
+}
+
+function setBackContent(titleEl, kwEl, meanEl, card){
+  titleEl.textContent = card.name || '';
+  kwEl.innerHTML = '';
+
+  // Shuffle keywords and pick first 3
+  let shuffled = (card.keywords || []).slice().sort(() => 0.5 - Math.random());
+  let selected = shuffled.slice(0, 3);
+
+  selected.forEach(k => {
+    const span = document.createElement('span');
+    span.className = 'kw';
+    span.textContent = k;
+    kwEl.appendChild(span);
+  });
+
+  meanEl.textContent = card.meaning || '';
+}
+
+function renderSingle(){
+  const card = DECK[(idx % DECK.length + DECK.length) % DECK.length];
+
+  // ensure front img exists (in case it was removed on error)
+  if(!els.singleImg || !els.singleImg.parentNode){
+    const newImg = document.createElement('img');
+    newImg.id = 'singleImg';
+    els.singleCard.querySelector('.front').prepend(newImg);
+    els.singleImg = newImg;
+  }
+  safeSetImg(els.singleImg, card.image,);
+
+  // back content
+  setBackContent(els.backTitle, els.backKeywords, els.backMeaning, card);
+
+  // AUTO-UNFLIP: always show front when (re)rendering Single
+  els.singleCard.classList.remove('show-back');
+}
+
+function renderThree(){
+  const positionLabels = ["Past", "Present", "Future"]; // <-- NEW
+
+  currentThree = pickThree();
+  const cardRoots = els.threeTray.querySelectorAll('.card');
+
+  currentThree.forEach((card, i) => {
+    const img = els.threeImgs[i];
+    if (img) safeSetImg(img, card.image, card.name);
+
+    // Set front label
+    els.threeLabels[i].textContent = positionLabels[i];
+
+    // Set back content
+    setBackContent(
+      els.threeBackTitles[i],
+      els.threeBackKws[i],
+      els.threeBackMeans[i],
+      card
+    );
+
+    // Add / update back label in same position
+    let backFace = els.threeBackTitles[i].closest('.card-face.back');
+    let backLabel = backFace.querySelector(".position-label");
+    if (!backLabel) {
+      backLabel = document.createElement("div");
+      backLabel.className = "label position-label"; // reuse front label style
+      backFace.appendChild(backLabel);
+    }
+    backLabel.textContent = positionLabels[i];
+
+    // Auto-unflip
+    const root = cardRoots[i];
+    if (root) root.classList.remove('show-back');
+  });
+}
+
+function pickThree(){
+  const pool = [...DECK];
+  const out = [];
+  for(let i=0;i<3;i++){
+    const j = Math.floor(Math.random()*pool.length);
+    out.push(pool.splice(j,1)[0]);
+  }
+  return out;
+}
+
+// Single delegated click handler: flip any .card on click
+function enableClickFlip(){
+  document.getElementById('app').addEventListener('click', (e)=>{
+    const card = e.target.closest('.card');
+    if (!card) return;
+
+    // Flip the card
+    card.classList.toggle('show-back');
+
+    // If showing the back, reshuffle keywords
+    if (card.classList.contains('show-back')) {
+      if (mode === 'single' && card.id === 'singleCard') {
+        setBackContent(els.backTitle, els.backKeywords, els.backMeaning, DECK[idx]);
+      } else if (mode === 'three') {
+        const cardIndex = Array.from(els.threeTray.querySelectorAll('.card')).indexOf(card);
+        if (cardIndex > -1) {
+          setBackContent(
+            els.threeBackTitles[cardIndex],
+            els.threeBackKws[cardIndex],
+            els.threeBackMeans[cardIndex],
+            currentThree[cardIndex]
+          );
+        }
+      }
+    }
+  });
+}
+
+function wrapCardsForFlip3D(){
+  document.querySelectorAll('.card').forEach(card=>{
+    // If already wrapped, skip
+    if (card.querySelector(':scope > .card-inner')) return;
+
+    const faces = Array.from(card.querySelectorAll(':scope > .card-face'));
+    const inner = document.createElement('div');
+    inner.className = 'card-inner';
+    // Move faces into inner wrapper
+    faces.forEach(f => inner.appendChild(f));
+    card.appendChild(inner);
+  });
+}
+
+function init(){
+  wrapCardsForFlip3D();   // ⬅️ add this line
+  enableClickFlip();
+  renderSingle();
+  renderThree();
+  syncModeUI();
+  // ...rest of your listeners...
+
+  // controls
+  els.modeSingle.addEventListener('click', ()=>{
+  const wasSingle = (mode === 'single');
+  mode = 'single';
+  syncModeUI();
+  if (wasSingle) {
+    // already in Single — shuffle to a new random card
+    idx = Math.floor(Math.random() * DECK.length);
+  }
+  renderSingle(); // always re-render (auto-unflips)
+});
+
+  els.modeThree.addEventListener('click', ()=>{
+    mode='three';
+    syncModeUI();
+    renderThree(); // draw a fresh trio & auto-unflip on switch
+  });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
